@@ -32,18 +32,20 @@ MongoClient.connect(MONGO_URI)
   });
 
 app.post('/validate', async (req, res) => {
-  const { username, hardware_id, app_user } = req.body;
-  if (!username || !hardware_id || !app_user) {
-    return res.status(400).json({ status: 'error', message: 'Missing username, hardware_id, or app_user' });
+  const { username, hwids, app_user } = req.body;
+  if (!username || !Array.isArray(hwids) || hwids.length === 0 || !app_user) {
+    return res.status(400).json({ status: 'error', message: 'Missing username, hwids, or app_user' });
   }
   try {
     const user = await usersCollection.findOne({ app_user });
-    console.log('[DEBUG] Query for:', { app_user, username, hardware_id });
+    console.log('[DEBUG] Query for:', { app_user, username, hwids });
     console.log('[DEBUG] User document:', user);
     if (user && Array.isArray(user.licenses)) {
       const now = new Date();
-      // Find license for this username and hardware_id
-      const license = user.licenses.find(l => l.username === username && l.hardware_id === hardware_id);
+      // Find license for this username and any matching hwid
+      const license = user.licenses.find(l => {
+        return l.username === username && Array.isArray(l.hwids) && l.hwids.some(hwid => hwids.includes(hwid));
+      });
       console.log('[DEBUG] Matched license:', license);
       if (license) {
         const exp = license.expiration ? new Date(license.expiration) : null;
@@ -56,7 +58,7 @@ app.post('/validate', async (req, res) => {
           return res.json({ status: 'expired' });
         }
       } else {
-        console.log('[DEBUG] Access denied: license not found for username and hardware_id');
+        console.log('[DEBUG] Access denied: license not found for username and hwid');
         return res.json({ status: 'denied' });
       }
     } else {
