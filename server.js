@@ -77,7 +77,7 @@ app.get('/api/check-update', async (req, res) => {
     // This returns the latest version information
     // Files can point to individual files in your GitHub repo using raw URLs
     const latestVersion = {
-      version: "1.0.0",
+      version: "1.0.1",
       build: "20260219.1",
       download_url: "https://github.com/Gabrielcesar9/project_newton/releases/download/v1.0.0/DungeonAutomationTool.exe",
       release_notes: "Initial release\n- Dungeon automation features\n- GUI improvements\n- Bug fixes",
