@@ -85,7 +85,7 @@ app.get('/api/check-update', async (req, res) => {
       min_version_required: "1.0.0",
       // Individual files from your GitHub repo
       // Run: python generate_file_hashes.py to get the file list with hashes
-      files:                   [
+      files:                         [
         {
           "path": "assets/Altar_Sagrado/background.jpg",
           "url": "https://raw.githubusercontent.com/Gabrielcesar9/project_newton/main/assets/Altar_Sagrado/background.jpg",
@@ -5640,6 +5640,11 @@ app.get('/api/check-update', async (req, res) => {
           "path": "dungeon_scripts/Parte_do_Mapa.py",
           "url": "https://raw.githubusercontent.com/Gabrielcesar9/project_newton/main/dungeon_scripts/Parte_do_Mapa.py",
           "hash": "3c8bb7b40d7376ad25dd40e73f2e2b97b064b1bd7011ee4dad2bd7d89de312b0"
+        },
+        {
+          "path": "dungeon_scripts/check.py",
+          "url": "https://raw.githubusercontent.com/Gabrielcesar9/project_newton/main/dungeon_scripts/check.py",
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
           "path": "dungeon_scripts/scope.py",
