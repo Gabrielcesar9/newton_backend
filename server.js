@@ -76,9 +76,9 @@ app.get('/api/check-update', async (req, res) => {
   try {
     // All files are now bundled in the exe - only download exe for updates
     const latestVersion = {
-      version: "1.0.2",
+      version: "1.0.3",
       build: "20260219.1",
-      download_url: "https://github.com/Gabrielcesar9/project_newton/releases/download/v1.0.2/DungeonAutomationTool.exe",
+      download_url: "https://github.com/Gabrielcesar9/project_newton/releases/download/v1.0.3/DungeonAutomationTool.exe",
       release_notes: "Initial release\n- Dungeon automation features\n- GUI improvements\n- Bug fixes\n- All assets and scripts bundled in exe",
       mandatory: false,
       min_version_required: "1.0.0"
