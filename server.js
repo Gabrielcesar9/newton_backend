@@ -76,9 +76,9 @@ app.get('/api/check-update', async (req, res) => {
   try {
     // All files are now bundled in the exe - only download exe for updates
     const latestVersion = {
-      version: "1.0.3",
+      version: "1.0.0",
       build: "20260219.1",
-      download_url: "https://github.com/Gabrielcesar9/project_newton/releases/download/v1.0.3/DungeonAutomationTool_v1.0.3.exe",
+      download_url: "https://github.com/go4urproject/cabal_pilot/releases/download/v1.0.0/CabalPilot_v1.0.0.exe",
       release_notes: "Cleaned up code, added update checker, and fixed some minor bugs.",
       mandatory: false,
       min_version_required: "1.0.0"
