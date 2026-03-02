@@ -79,7 +79,7 @@ app.get('/api/check-update', async (req, res) => {
     const latestVersion = {
       version: "1.0.1",
       build: "20260219.1",
-      download_url: "https://github.com/Gabrielcesar9/project_newton/releases/download/v1.0.0/DungeonAutomationTool.exe",
+      download_url: "https://github.com/Gabrielcesar9/project_newton/releases/download/v1.0.1/DungeonAutomationTool.exe",
       release_notes: "Initial release\n- Dungeon automation features\n- GUI improvements\n- Bug fixes",
       mandatory: false,
       min_version_required: "1.0.0",
