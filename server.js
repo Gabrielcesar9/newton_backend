@@ -74,45 +74,41 @@ app.post('/validate', async (req, res) => {
 // Update checker endpoint - for bundled exe updates only
 app.get('/api/check-update', async (req, res) => {
   try {
-    // All files are now bundled in the exe - only download exe for updates
-    const latestVersion = {
-      version: "1.0.0",
-      build: "20260219.1",
-      download_url: "https://github.com/go4urproject/cabal_pilot/releases/download/v1.0.0/CabalPilot_v1.0.0.exe",
-      release_notes: "Cleaned up code, added update checker, and fixed some minor bugs.",
-      mandatory: false,
-      min_version_required: "1.0.0"
-    };
-    
-    res.json(latestVersion);
+    const updatesCollection = db.collection('updates');
+
+    const latest = await updatesCollection.findOne(
+    {},
+    {
+        sort: { created_at: -1 },
+        projection: {
+            _id: 0
+        }
+    }
+);
+
+    if (!latest) {
+      return res.status(404).json({
+        status: "error",
+        message: "No updates available"
+      });
+    }
+
+    res.json(latest);
+
   } catch (err) {
-    console.error('Error serving update info:', err);
-    return res.status(500).json({ status: 'error', message: 'Internal server error' });
+    console.error(err);
+    res.status(500).json({
+      status: "error",
+      message: "Internal server error"
+    });
   }
 });
 
-// Optional: Store update info in database
-app.post('/api/update-version', async (req, res) => {
-  const { version, build, download_url, release_notes, mandatory } = req.body;
-  
-  try {
-    const updatesCollection = db.collection('updates');
-    const result = await updatesCollection.insertOne({
-      version,
-      build,
-      download_url,
-      release_notes,
-      mandatory,
-      created_at: new Date()
-    });
-    
-    res.json({ status: 'success', id: result.insertedId });
-  } catch (err) {
-    console.error('Error storing update info:', err);
-    return res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
+app.get('/', (req, res) => {
+  res.send('Newton Validation Server is running.');
 });
 
 app.listen(PORT, () => {
   console.log(`Validation server running on port ${PORT}`);
 });
+
