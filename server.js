@@ -14,7 +14,7 @@ const COLLECTION = 'users';
 const SESSION_TIMEOUT_MS = 90 * 1000; // 90 seconds
 const DEFAULT_MAX_INSTANCES = 1;
 
-let db, usersCollection, sessionsCollection;
+let db, usersCollection, sessionsCollection, dllCollection;
 
 // Connect to MongoDB
 if (!MONGO_URI) {
@@ -27,6 +27,7 @@ MongoClient.connect(MONGO_URI)
     db = client.db(DB_NAME);
     usersCollection = db.collection(COLLECTION);
     sessionsCollection = db.collection("sessions");
+    dllCollection = db.collection("dll_updates");
     console.log('Connected to MongoDB');
   })
   .catch(err => {
@@ -298,6 +299,44 @@ app.post('/logout', async (req, res) => {
     });
 
   }
+
+});
+
+app.get('/api/check-dll', async (req, res) => {
+
+    try {
+
+        const dll =
+            await dllCollection.findOne({
+                name: "monitor"
+            });
+
+        if (!dll) {
+
+            return res.status(404).json({
+                status: "error"
+            });
+
+        }
+
+        return res.json({
+
+            version: dll.version,
+            mandatory: dll.mandatory || false,
+            download_url: dll.download_url
+
+        });
+
+    }
+    catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            status: "error"
+        });
+
+    }
 
 });
 
