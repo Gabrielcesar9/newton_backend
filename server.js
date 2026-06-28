@@ -11,8 +11,10 @@ require('dotenv').config(); // Load .env file if present
 const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'Newton';
 const COLLECTION = 'users';
+const SESSION_TIMEOUT_MS = 90 * 1000; // 90 seconds
+const DEFAULT_MAX_INSTANCES = 1;
 
-let db, usersCollection;
+let db, usersCollection, sessionsCollection;
 
 // Connect to MongoDB
 if (!MONGO_URI) {
@@ -24,6 +26,7 @@ MongoClient.connect(MONGO_URI)
   .then(client => {
     db = client.db(DB_NAME);
     usersCollection = db.collection(COLLECTION);
+    sessionsCollection = db.collection("sessions");
     console.log('Connected to MongoDB');
   })
   .catch(err => {
@@ -32,43 +35,158 @@ MongoClient.connect(MONGO_URI)
   });
 
 app.post('/validate', async (req, res) => {
-  const { username, hwids, app_user } = req.body;
-  if (!username || !Array.isArray(hwids) || hwids.length === 0 || !app_user) {
-    return res.status(400).json({ status: 'error', message: 'Missing username, hwids, or app_user' });
+
+  const {
+    hwids,
+    app_user,
+    session_id
+  } = req.body;
+
+  if (
+    !Array.isArray(hwids) ||
+    hwids.length === 0 ||
+    !app_user ||
+    !session_id
+  ) {
+    return res.status(400).json({
+      status: "error",
+      message: "Missing hwids, app_user or session_id"
+    });
   }
+
   try {
+
     const user = await usersCollection.findOne({ app_user });
-    console.log('[DEBUG] Query for:', { app_user, username, hwids });
-    console.log('[DEBUG] User document:', user);
-    if (user && Array.isArray(user.licenses)) {
-      const now = new Date();
-      // Find license for this username and any matching hwid
-      const license = user.licenses.find(l => {
-        return l.username === username && Array.isArray(l.hwids) && l.hwids.some(hwid => hwids.includes(hwid));
+
+    console.log("[DEBUG] Query:", {
+      app_user,
+      hwids,
+      session_id
+    });
+
+    if (!user) {
+
+      console.log("[DEBUG] User not found");
+
+      return res.json({
+        status: "denied"
       });
-      console.log('[DEBUG] Matched license:', license);
-      if (license) {
-        const exp = license.expiration ? new Date(license.expiration) : null;
-        console.log('[DEBUG] Now:', now.toISOString(), 'Expiration:', exp ? exp.toISOString() : null);
-        if (exp && exp >= now) {
-          console.log('[DEBUG] Access allowed');
-          return res.json({ status: 'allowed' });
-        } else {
-          console.log('[DEBUG] Subscription expired');
-          return res.json({ status: 'expired' });
-        }
-      } else {
-        console.log('[DEBUG] Access denied: license not found for username and hwid');
-        return res.json({ status: 'denied' });
-      }
-    } else {
-      console.log('[DEBUG] Access denied: app_user not found or no licenses');
-      return res.json({ status: 'denied' });
+
     }
-  } catch (err) {
-    console.error('Error querying MongoDB:', err);
-    return res.status(500).json({ status: 'error', message: 'Internal server error' });
+
+    const now = new Date();
+
+    // Remove expired sessions
+    await sessionsCollection.deleteMany({
+      expiresAt: { $lt: now }
+    });
+
+    // Check HWID
+    const hwidMatch =
+      Array.isArray(user.hwids) &&
+      user.hwids.some(hwid => hwids.includes(hwid));
+
+    if (!hwidMatch) {
+
+      console.log("[DEBUG] HWID mismatch");
+
+      return res.json({
+        status: "denied"
+      });
+
+    }
+
+    // Check expiration
+    const expiration =
+      user.expiration
+        ? new Date(user.expiration)
+        : null;
+
+    if (!expiration || expiration < now) {
+
+      console.log("[DEBUG] Subscription expired");
+
+      return res.json({
+        status: "expired"
+      });
+
+    }
+
+    // Existing session?
+    const existing =
+      await sessionsCollection.findOne({
+        session_id
+      });
+
+    if (existing) {
+
+      await sessionsCollection.updateOne(
+        { session_id },
+        {
+          $set: {
+            expiresAt: new Date(
+              Date.now() + SESSION_TIMEOUT_MS
+            )
+          }
+        }
+      );
+
+      return res.json({
+        status: "allowed"
+      });
+
+    }
+
+    // Count active sessions
+    const activeSessions =
+      await sessionsCollection.countDocuments({
+        app_user
+      });
+
+    const maxInstances =
+      user.max_instances || 1;
+
+    if (activeSessions >= maxInstances) {
+
+      console.log("[DEBUG] Too many instances");
+
+      return res.json({
+        status: "too_many_instances"
+      });
+
+    }
+
+    // Create new session
+    await sessionsCollection.insertOne({
+
+      session_id,
+
+      app_user,
+
+      expiresAt: new Date(
+        Date.now() + SESSION_TIMEOUT_MS
+      )
+
+    });
+
+    console.log("[DEBUG] Session created");
+
+    return res.json({
+      status: "allowed"
+    });
+
   }
+  catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      status: "error",
+      message: "Internal server error"
+    });
+
+  }
+
 });
 
 // Update checker endpoint - for bundled exe updates only
@@ -104,11 +222,89 @@ app.get('/api/check-update', async (req, res) => {
   }
 });
 
+app.post('/heartbeat', async (req, res) => {
+
+  const { session_id } = req.body;
+
+  if (!session_id) {
+    return res.status(400).json({
+      status: "error",
+      message: "Missing session_id"
+    });
+  }
+
+  try {
+
+    const result = await sessionsCollection.updateOne(
+      { session_id },
+      {
+        $set: {
+          expiresAt: new Date(Date.now() + SESSION_TIMEOUT_MS)
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.json({
+        status: "invalid_session"
+      });
+    }
+
+    return res.json({
+      status: "ok"
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      status: "error"
+    });
+
+  }
+
+});
+
+app.post('/logout', async (req, res) => {
+
+  const { session_id } = req.body;
+
+  if (!session_id) {
+    return res.status(400).json({
+      status: "error",
+      message: "Missing session_id"
+    });
+  }
+
+  try {
+
+    await sessionsCollection.deleteOne({
+      session_id
+    });
+
+    console.log("[DEBUG] Session removed:", session_id);
+
+    return res.json({
+      status: "ok"
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      status: "error"
+    });
+
+  }
+
+});
+
 app.get('/', (req, res) => {
-  res.send('Newton Validation Server is running.');
+  res.send('Newton Validation Server is running. 1');
 });
 
 app.listen(PORT, () => {
   console.log(`Validation server running on port ${PORT}`);
 });
-
