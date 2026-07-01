@@ -70,8 +70,9 @@ app.post('/validate', async (req, res) => {
       console.log("[DEBUG] User not found");
 
       return res.json({
-        status: "denied"
-      });
+      status: "denied",
+      message: "User not found."
+    });
 
     }
 
@@ -92,8 +93,9 @@ app.post('/validate', async (req, res) => {
       console.log("[DEBUG] HWID mismatch");
 
       return res.json({
-        status: "denied"
-      });
+      status: "denied",
+      message: "This computer is not authorized."
+    });
 
     }
 
@@ -108,8 +110,9 @@ app.post('/validate', async (req, res) => {
       console.log("[DEBUG] Subscription expired");
 
       return res.json({
-        status: "expired"
-      });
+      status: "expired",
+      message: "Subscription expired. Please renew your subscription."
+    });
 
     }
 
@@ -152,8 +155,9 @@ app.post('/validate', async (req, res) => {
       console.log("[DEBUG] Too many instances");
 
       return res.json({
-        status: "too_many_instances"
-      });
+      status: "too_many_instances",
+      message: `Maximum of ${maxInstances} instance(s) already running.`
+    });
 
     }
 
