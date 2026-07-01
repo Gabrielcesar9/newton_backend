@@ -225,45 +225,93 @@ app.get('/api/check-update', async (req, res) => {
 
 app.post('/heartbeat', async (req, res) => {
 
-  const { session_id } = req.body;
+    const { session_id } = req.body;
 
-  if (!session_id) {
-    return res.status(400).json({
-      status: "error",
-      message: "Missing session_id"
-    });
-  }
-
-  try {
-
-    const result = await sessionsCollection.updateOne(
-      { session_id },
-      {
-        $set: {
-          expiresAt: new Date(Date.now() + SESSION_TIMEOUT_MS)
-        }
-      }
-    );
-
-    if (result.matchedCount === 0) {
-      return res.json({
-        status: "invalid_session"
-      });
+    if (!session_id) {
+        return res.status(400).json({
+            status: "error",
+            message: "Missing session_id"
+        });
     }
 
-    return res.json({
-      status: "ok"
-    });
+    try {
 
-  } catch (err) {
+        // Find session
+        const session = await sessionsCollection.findOne({ session_id });
 
-    console.error(err);
+        if (!session) {
+            return res.json({
+                status: "invalid_session"
+            });
+        }
 
-    return res.status(500).json({
-      status: "error"
-    });
+        // Find user
+        const user = await usersCollection.findOne({
+            app_user: session.app_user
+        });
 
-  }
+        if (!user) {
+
+            await sessionsCollection.deleteOne({ session_id });
+
+            return res.json({
+                status: "invalid_session"
+            });
+
+        }
+
+        const now = new Date();
+
+        const expiration =
+            user.expiration
+                ? new Date(user.expiration)
+                : null;
+
+        if (!expiration || expiration <= now) {
+
+            // Remove the session immediately
+            await sessionsCollection.deleteOne({
+                session_id
+            });
+
+            return res.json({
+                status: "expired"
+            });
+
+        }
+
+        const remaining_ms = expiration.getTime() - now.getTime();
+
+        // Refresh session timeout
+        await sessionsCollection.updateOne(
+            { session_id },
+            {
+                $set: {
+                    expiresAt: new Date(
+                        Date.now() + SESSION_TIMEOUT_MS
+                    )
+                }
+            }
+        );
+
+        return res.json({
+
+            status: "ok",
+
+            remaining_ms
+
+        });
+
+    }
+    catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            status: "error"
+        });
+
+    }
 
 });
 
