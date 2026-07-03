@@ -3,8 +3,19 @@ const express = require('express');
 const { MongoClient } = require('mongodb');
 const app = express();
 const PORT = process.env.PORT || 3000;
+const rateLimit = require("express-rate-limit");
 
 app.use(express.json());
+const validateLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 10,             // max 10 validation requests per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: "Too many validation attempts. Please wait a minute."
+    }
+});
 
 require('dotenv').config(); // Load .env file if present
 
@@ -75,7 +86,7 @@ MongoClient.connect(MONGO_URI)
     process.exit(1);
   });
 
-app.post('/validate', async (req, res) => {
+app.post('/validate', validateLimiter, async (req, res) => {
 
   const {
     hwids,
