@@ -21,7 +21,47 @@ if (!MONGO_URI) {
   console.error('MONGO_URI is not set!');
   process.exit(1);
 }
+const PLAN_DUNGEONS = {
 
+    Free: [
+        "Lake_in_Dusk",
+    ],
+
+    Silver: [
+        "Lake_in_Dusk",
+        "Holy_WindMill",
+        "Holy_Keldrasil",
+    ],
+
+    Gold: [
+        "Lake_in_Dusk",
+        "Garden_of_Dust",
+        "Holy_WindMill",
+        "Holy_Keldrasil",
+        "Holy_Shrine",
+        "Frozen_Canyon",
+        "Pandemonium",
+        "ICU+",
+        "ICR+"
+    ],
+
+    Diamond: [
+        "Lake_in_Dusk",
+        "Garden_of_Dust",
+        "Holy_WindMill",
+        "Holy_Keldrasil",
+        "Holy_Shrine",
+        "Frozen_Canyon",
+        "Pandemonium",
+        "ICU+",
+        "ICR+",
+        "Edge of Phantom",
+        "Edge of Phantom+",
+        "Flame_Nest",
+        "Devil_Tower_I",
+        "Devil_Tower_II"
+    ]
+};
 MongoClient.connect(MONGO_URI)
   .then(client => {
     db = client.db(DB_NAME);
@@ -136,8 +176,9 @@ app.post('/validate', async (req, res) => {
       );
 
       return res.json({
-        status: "allowed"
-      });
+      status: "allowed",
+      allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
+    });
 
     }
 
@@ -177,8 +218,9 @@ app.post('/validate', async (req, res) => {
     console.log("[DEBUG] Session created");
 
     return res.json({
-      status: "allowed"
-    });
+    status: "allowed",
+    allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
+  });
 
   }
   catch (err) {
@@ -299,12 +341,10 @@ app.post('/heartbeat', async (req, res) => {
         );
 
         return res.json({
-
-            status: "ok",
-
-            remaining_ms
-
-        });
+        status: "ok",
+        remaining_ms,
+        allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
+    });
 
     }
     catch (err) {
