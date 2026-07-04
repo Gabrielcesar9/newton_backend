@@ -25,7 +25,7 @@ const COLLECTION = 'users';
 const SESSION_TIMEOUT_MS = 90 * 1000; // 90 seconds
 const DEFAULT_MAX_INSTANCES = 1;
 
-let db, usersCollection, sessionsCollection, dllCollection;
+let db, usersCollection, sessionsCollection, dllCollection,dungeonRunsCollection;
 
 // Connect to MongoDB
 if (!MONGO_URI) {
@@ -79,6 +79,7 @@ MongoClient.connect(MONGO_URI)
     usersCollection = db.collection(COLLECTION);
     sessionsCollection = db.collection("sessions");
     dllCollection = db.collection("dll_updates");
+    dungeonRunsCollection = db.collection("dungeon_runs");
     console.log('Connected to MongoDB');
   })
   .catch(err => {
@@ -441,6 +442,58 @@ app.get('/api/check-dll', async (req, res) => {
 
     }
 
+});
+
+app.post("/dungeon-complete", async (req, res) => {
+    try {
+
+        const { session_id, dungeon } = req.body;
+
+        if (!session_id || !dungeon) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing fields."
+            });
+        }
+
+        const session = await sessionsCollection.findOne({ session_id });
+
+        if (!session) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid session."
+            });
+        }
+
+        const user = await usersCollection.findOne({
+            app_user: session.app_user
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "User not found."
+            });
+        }
+
+        await dungeonRunsCollection.insertOne({
+            app_user: user.app_user,
+            dungeon,
+            completed_at: new Date()
+        });
+
+        res.json({ success: true });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+
+    }
 });
 
 app.get('/', (req, res) => {
