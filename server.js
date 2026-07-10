@@ -51,6 +51,7 @@ const PLAN_DUNGEONS = {
         "Holy_Keldrasil",
         "Holy_Shrine",
         "Frozen_Canyon",
+        "Ancient_Tomb",
         "Pandemonium",
         "ICU+",
         "ICR+"
@@ -70,7 +71,24 @@ const PLAN_DUNGEONS = {
         "Edge of Phantom+",
         "Flame_Nest",
         "Devil_Tower_I",
-        "Devil_Tower_II"
+        "Devil_Tower_II",
+        "Acheron_Arena",
+        "Ancient_Tomb",
+        "Terminus_Machina",
+        "Catacomb_Frost_Awakened",
+        "Chaos_Arena_Lv1",
+        "Chaos_Arena_Lv2",
+        "Chaos_Arena_Lv3",
+        "Chaos_Arena_Lv4",
+        "Chaos_Arena_Lv5",
+        "Chaos_Arena_Lv6",
+        "Chaos_Arena_Lv7",
+        "Hazardous_Valley_Awakened",
+        "Panic_Cave_Awakened",
+        "Steamer_Crazy_Awakened",
+        "Lava_Hellfire_Awakened",
+        "Tower_of_Undead_B3F",
+        "Tower_of_Undead_B3F_Ring_Farm",
     ]
 };
 MongoClient.connect(MONGO_URI)
