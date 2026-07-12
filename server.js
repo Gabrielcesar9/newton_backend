@@ -465,7 +465,14 @@ app.get('/api/check-dll', async (req, res) => {
 app.post("/dungeon-complete", async (req, res) => {
     try {
 
-        const { session_id, dungeon } = req.body;
+        const {
+            session_id,
+            dungeon,
+            start_time,
+            end_time,
+            duration,
+            drops
+        } = req.body;
 
         if (!session_id || !dungeon) {
             return res.status(400).json({
@@ -497,7 +504,10 @@ app.post("/dungeon-complete", async (req, res) => {
         await dungeonRunsCollection.insertOne({
             app_user: user.app_user,
             dungeon,
-            completed_at: new Date()
+            start_time: start_time ? new Date(start_time * 1000) : null,
+            end_time: end_time ? new Date(end_time * 1000) : new Date(),
+            duration: typeof duration === "number" ? duration : null,
+            drops: Array.isArray(drops) ? drops : []
         });
 
         res.json({ success: true });
