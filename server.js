@@ -103,8 +103,18 @@ const PLAN_DUNGEONS = {
         "Mirage_Island_Awakened",
         "Celestia",
         "Purifier_in_the_Woords",
-    ]
+    ],
 };
+    PLAN_DUNGEONS.Gold = [
+    ...PLAN_DUNGEONS.Silver,
+    ...PLAN_DUNGEONS.Gold
+    ],
+
+    PLAN_DUNGEONS.Diamond = [
+    ...PLAN_DUNGEONS.Gold,
+    ...PLAN_DUNGEONS.Diamond
+    ]
+    
 MongoClient.connect(MONGO_URI)
   .then(client => {
     db = client.db(DB_NAME);
