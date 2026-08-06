@@ -76,7 +76,7 @@ const PLAN_DUNGEONS = {
         "Forgotten_Temple_B2F_Awakened",
         "Illusion_Castle_Underworld_Apocrypha",
         "Illusion_Castle_Radiant_Hall_Apocrypha",
-        "Arena_Acheron",
+        "Acheron_Arena",
         "Holy_Keldrasil",
         "Tower_of_Undead_B3F_Part2",
         "Devil_Tower_I",
