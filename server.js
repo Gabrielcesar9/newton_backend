@@ -25,7 +25,7 @@ const COLLECTION = 'users';
 const SESSION_TIMEOUT_MS = 90 * 1000; // 90 seconds
 const DEFAULT_MAX_INSTANCES = 1;
 
-let db, usersCollection, sessionsCollection, dllCollection,dungeonRunsCollection;
+let db, usersCollection, sessionsCollection, dllCollection, dungeonRunsCollection, dungeonStatsCollection;
 
 // Connect to MongoDB
 if (!MONGO_URI) {
@@ -42,14 +42,16 @@ const PLAN_DUNGEONS = {
         "Volcanic_Citadel",
         "Illusion_Castle_Underworld",
         "Illusion_Castle_Underworld+",
+        "Catacomb_Frost",
         "Steamer_Crazy",
         "Lava_Hellfire",
         "Hazardous_Valley",
         "Altar_of_Siena_B1F",
         "Altar_of_Siena_B2F",
+        "Altar_of_Siena_B2F+",
+        "Catacomb_Frost_Awakened",
         "Steamer_Crazy_Awakened",
         "Lava_Hellfire_Awakened",
-        "Hazardous_Valley_Awakened",
         "Baldus",
         "Forbidden_Island",
         "Forbidden_Island+",
@@ -88,6 +90,12 @@ const PLAN_DUNGEONS = {
     ],
 
     Diamond: [
+        "Catacomb_Frost_Premium",
+        "Steamer_Crazy_Premium",
+        "Lava_Hellfire_Premium",
+        "Catacomb_Frost_Elite",
+        "Steamer_Crazy_Elite",
+        "Lava_Hellfire_Elite",
         "Terminus_Machina",
         "Ancient_Tomb",
         "Flame_Nest",
@@ -98,6 +106,7 @@ const PLAN_DUNGEONS = {
         "Garden_of_Dust",
         "Tower_of_Undead_B3F",
         "Holy_Shrine",
+        "Holy_Exedium",
         "Forgotten_Temple_B3F",
         "Mirage_Island",
         "Mirage_Island_Awakened",
@@ -122,6 +131,7 @@ MongoClient.connect(MONGO_URI)
     sessionsCollection = db.collection("sessions");
     dllCollection = db.collection("dll_updates");
     dungeonRunsCollection = db.collection("dungeon_runs");
+    dungeonStatsCollection = db.collection("dungeon_stats");
     console.log('Connected to MongoDB');
   })
   .catch(err => {
@@ -534,13 +544,242 @@ app.post("/dungeon-complete", async (req, res) => {
             drops: Array.isArray(drops) ? drops : []
         });
 
-        res.json({ success: true });
+        // Update aggregated dungeon statistics
+
+        const dropCounts = {};
+
+        if (Array.isArray(drops)) {
+            for (const drop of drops) {
+                if (!drop) continue;
+
+                const dropName =
+                    typeof drop === "string"
+                        ? drop
+                        : drop.name;
+
+                if (!dropName) continue;
+
+                dropCounts[dropName] =
+                    (dropCounts[dropName] || 0) + 1;
+            }
+        }
+
+        const incomingDrops = Object.entries(dropCounts).map(
+            ([name, count]) => ({
+                name,
+                count
+            })
+        );
+
+        const runDuration =
+            typeof duration === "number" && duration >= 0
+                ? duration
+                : 0;
+
+        await dungeonStatsCollection.updateOne(
+            {
+                app_user: user.app_user,
+                dungeon
+            },
+            [
+                {
+                    $set: {
+                        app_user: user.app_user,
+                        dungeon,
+
+                        runs: {
+                            $add: [
+                                { $ifNull: ["$runs", 0] },
+                                1
+                            ]
+                        },
+
+                        total_time: {
+                            $add: [
+                                { $ifNull: ["$total_time", 0] },
+                                runDuration
+                            ]
+                        },
+
+                        drops: {
+                            $let: {
+                                vars: {
+                                    existingDrops: {
+                                        $ifNull: ["$drops", []]
+                                    }
+                                },
+
+                                in: {
+                                    $reduce: {
+                                        input: incomingDrops,
+                                        initialValue: "$$existingDrops",
+
+                                        in: {
+                                            $let: {
+                                                vars: {
+                                                    existingIndex: {
+                                                        $indexOfArray: [
+                                                            {
+                                                                $map: {
+                                                                    input: "$$value",
+                                                                    as: "existingDrop",
+                                                                    in: "$$existingDrop.name"
+                                                                }
+                                                            },
+                                                            "$$this.name"
+                                                        ]
+                                                    }
+                                                },
+
+                                                in: {
+                                                    $cond: [
+                                                        {
+                                                            $gte: [
+                                                                "$$existingIndex",
+                                                                0
+                                                            ]
+                                                        },
+
+                                                        {
+                                                            $map: {
+                                                                input: "$$value",
+                                                                as: "existingDrop",
+
+                                                                in: {
+                                                                    $cond: [
+                                                                        {
+                                                                            $eq: [
+                                                                                "$$existingDrop.name",
+                                                                                "$$this.name"
+                                                                            ]
+                                                                        },
+
+                                                                        {
+                                                                            name: "$$existingDrop.name",
+                                                                            count: {
+                                                                                $add: [
+                                                                                    "$$existingDrop.count",
+                                                                                    "$$this.count"
+                                                                                ]
+                                                                            }
+                                                                        },
+
+                                                                        "$$existingDrop"
+                                                                    ]
+                                                                }
+                                                            }
+                                                        },
+
+                                                        {
+                                                            $concatArrays: [
+                                                                "$$value",
+                                                                [
+                                                                    {
+                                                                        name: "$$this.name",
+                                                                        count: "$$this.count"
+                                                                    }
+                                                                ]
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            {
+                upsert: true
+            }
+        );
+
+                res.json({ success: true });
+
+            } catch (err) {
+
+                console.error(err);
+
+                res.status(500).json({
+                    success: false,
+                    message: "Internal server error"
+                });
+
+            }
+        });
+
+app.get("/dungeon-stats", async (req, res) => {
+    try {
+
+        const { session_id, dungeon } = req.query;
+
+        if (!session_id || !dungeon) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing session_id or dungeon."
+            });
+        }
+
+        const session = await sessionsCollection.findOne({
+            session_id
+        });
+
+        if (!session) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid session."
+            });
+        }
+
+        const user = await usersCollection.findOne({
+            app_user: session.app_user
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "User not found."
+            });
+        }
+
+        const stats = await dungeonStatsCollection.findOne(
+            {
+                app_user: user.app_user,
+                dungeon
+            },
+            {
+                projection: {
+                    _id: 0,
+                    app_user: 0,
+                    dungeon: 0
+                }
+            }
+        );
+
+        if (!stats) {
+            return res.json({
+                success: true,
+                runs: 0,
+                total_time: 0,
+                drops: []
+            });
+        }
+
+        return res.json({
+            success: true,
+            runs: stats.runs || 0,
+            total_time: stats.total_time || 0,
+            drops: stats.drops || []
+        });
 
     } catch (err) {
 
         console.error(err);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Internal server error"
         });
