@@ -240,8 +240,9 @@ app.post('/validate', validateLimiter, async (req, res) => {
       );
 
       return res.json({
-      status: "allowed",
-      allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
+        status: "allowed",
+        plan: user.plan,
+        allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
     });
 
     }
@@ -282,9 +283,10 @@ app.post('/validate', validateLimiter, async (req, res) => {
     console.log("[DEBUG] Session created");
 
     return res.json({
-    status: "allowed",
-    allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
-  });
+        status: "allowed",
+        plan: user.plan,
+        allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
+    });
 
   }
   catch (err) {
@@ -405,10 +407,11 @@ app.post('/heartbeat', async (req, res) => {
         );
 
         return res.json({
-        status: "ok",
-        remaining_ms,
-        allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
-    });
+            status: "ok",
+            remaining_ms,
+            plan: user.plan,
+            allowed_dungeons: PLAN_DUNGEONS[user.plan] || []
+        });
 
     }
     catch (err) {
