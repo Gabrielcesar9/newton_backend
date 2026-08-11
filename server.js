@@ -335,37 +335,61 @@ app.get('/api/check-update', async (req, res) => {
   }
 });
 
-// Update checker endpoint - for bundled exe updates only
-app.get('/api/check-update', async (req, res) => {
-  try {
-    const updatesCollection = db.collection('updates');
+// Register a new bundled EXE release
+app.post('/api/releases', async (req, res) => {
+    try {
+        const {
+            version,
+            build,
+            download_url,
+            release_notes,
+            mandatory
+        } = req.body;
 
-    const latest = await updatesCollection.findOne(
-    {},
-    {
-        sort: { created_at: -1 },
-        projection: {
-            _id: 0
+        if (!version || !build || !download_url) {
+            return res.status(400).json({
+                status: "error",
+                message: "version, build and download_url are required"
+            });
         }
+
+        const updatesCollection = db.collection('updates');
+
+        // Prevent duplicate versions
+        const existing = await updatesCollection.findOne({ version });
+
+        if (existing) {
+            return res.status(409).json({
+                status: "error",
+                message: `Version ${version} already exists`
+            });
+        }
+
+        const update = {
+            version,
+            build,
+            download_url,
+            release_notes: release_notes || "",
+            mandatory: mandatory === true,
+            created_at: new Date()
+        };
+
+        await updatesCollection.insertOne(update);
+
+        res.status(201).json({
+            status: "success",
+            message: `Version ${version} published`,
+            update
+        });
+
+    } catch (err) {
+        console.error("Release registration error:", err);
+
+        res.status(500).json({
+            status: "error",
+            message: "Internal server error"
+        });
     }
-);
-
-    if (!latest) {
-      return res.status(404).json({
-        status: "error",
-        message: "No updates available"
-      });
-    }
-
-    res.json(latest);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      status: "error",
-      message: "Internal server error"
-    });
-  }
 });
 
 app.post('/heartbeat', async (req, res) => {
