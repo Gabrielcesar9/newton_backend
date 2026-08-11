@@ -335,6 +335,39 @@ app.get('/api/check-update', async (req, res) => {
   }
 });
 
+// Update checker endpoint - for bundled exe updates only
+app.get('/api/check-update', async (req, res) => {
+  try {
+    const updatesCollection = db.collection('updates');
+
+    const latest = await updatesCollection.findOne(
+    {},
+    {
+        sort: { created_at: -1 },
+        projection: {
+            _id: 0
+        }
+    }
+);
+
+    if (!latest) {
+      return res.status(404).json({
+        status: "error",
+        message: "No updates available"
+      });
+    }
+
+    res.json(latest);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: "error",
+      message: "Internal server error"
+    });
+  }
+});
+
 app.post('/heartbeat', async (req, res) => {
 
     const { session_id } = req.body;
