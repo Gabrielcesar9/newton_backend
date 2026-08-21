@@ -104,6 +104,7 @@ const PLAN_DUNGEONS = {
         "Glacies_Inferna",
         "Abandoned_City",
         "Garden_of_Dust",
+        "Tower_of_Undead_B3F_Elite",
         "Tower_of_Undead_B3F",
         "Holy_Shrine",
         "Holy_Exedium",
