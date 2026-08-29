@@ -113,6 +113,7 @@ const PLAN_DUNGEONS = {
         "Mirage_Island_Awakened",
         "Celestia",
         "Purifier_in_the_Woords",
+        "Monster_Hunt,
     ],
 };
     PLAN_DUNGEONS.Gold = [
