@@ -608,7 +608,7 @@ app.post("/dungeon-complete", async (req, res) => {
 
         // Update aggregated dungeon statistics
 
-        const dropCounts = {};
+        const dropCounts = Object.create(null);
 
         if (Array.isArray(drops)) {
             for (const drop of drops) {
@@ -619,10 +619,17 @@ app.post("/dungeon-complete", async (req, res) => {
                         ? drop
                         : drop.name;
 
-                if (!dropName) continue;
+                if (typeof dropName !== "string" || !dropName.trim()) continue;
+
+                const count =
+                    typeof drop === "string" || drop.count === undefined
+                        ? 1
+                        : drop.count;
+
+                if (!Number.isSafeInteger(count) || count <= 0) continue;
 
                 dropCounts[dropName] =
-                    (dropCounts[dropName] || 0) + 1;
+                    (dropCounts[dropName] || 0) + count;
             }
         }
 
