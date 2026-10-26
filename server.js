@@ -1,5 +1,7 @@
 // Node.js Express server with MongoDB for user-hardware validation
 const express = require('express');
+const { normalizeDrops, statsUpdate } = require('./drop_storage');
+const { parseFilters, summarizeReports } = require('./drop_analytics');
 const { MongoClient } = require('mongodb');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -597,51 +599,23 @@ app.post("/dungeon-complete", async (req, res) => {
             });
         }
 
+        const incomingDrops = normalizeDrops(drops);
+
         await dungeonRunsCollection.insertOne({
             app_user: user.app_user,
             dungeon,
             start_time: start_time ? new Date(start_time * 1000) : null,
             end_time: end_time ? new Date(end_time * 1000) : new Date(),
             duration: typeof duration === "number" ? duration : null,
-            drops: Array.isArray(drops) ? drops : []
+            drop_schema_version: 2,
+            drop_details_tracked: req.body.drop_details_tracked === true,
+            drop_tracking_complete: typeof req.body.drop_tracking_complete === 'boolean'
+                ? req.body.drop_tracking_complete : null,
+            drops: incomingDrops
         });
 
-        // Update aggregated dungeon statistics
-
-        const dropCounts = Object.create(null);
-
-        if (Array.isArray(drops)) {
-            for (const drop of drops) {
-                if (!drop) continue;
-
-                const dropName =
-                    typeof drop === "string"
-                        ? drop
-                        : drop.name;
-
-                if (typeof dropName !== "string" || !dropName.trim()) continue;
-
-                const count =
-                    typeof drop === "string" || drop.count === undefined
-                        ? 1
-                        : drop.count;
-
-                if (!Number.isSafeInteger(count) || count <= 0) continue;
-
-                dropCounts[dropName] =
-                    (dropCounts[dropName] || 0) + count;
-            }
-        }
-
-        const incomingDrops = Object.entries(dropCounts).map(
-            ([name, count]) => ({
-                name,
-                count
-            })
-        );
-
         const runDuration =
-            typeof duration === "number" && duration >= 0
+            Number.isFinite(duration) && duration >= 0
                 ? duration
                 : 0;
 
@@ -650,117 +624,7 @@ app.post("/dungeon-complete", async (req, res) => {
                 app_user: user.app_user,
                 dungeon
             },
-            [
-                {
-                    $set: {
-                        app_user: user.app_user,
-                        dungeon,
-
-                        runs: {
-                            $add: [
-                                { $ifNull: ["$runs", 0] },
-                                1
-                            ]
-                        },
-
-                        total_time: {
-                            $add: [
-                                { $ifNull: ["$total_time", 0] },
-                                runDuration
-                            ]
-                        },
-
-                        drops: {
-                            $let: {
-                                vars: {
-                                    existingDrops: {
-                                        $ifNull: ["$drops", []]
-                                    }
-                                },
-
-                                in: {
-                                    $reduce: {
-                                        input: incomingDrops,
-                                        initialValue: "$$existingDrops",
-
-                                        in: {
-                                            $let: {
-                                                vars: {
-                                                    existingIndex: {
-                                                        $indexOfArray: [
-                                                            {
-                                                                $map: {
-                                                                    input: "$$value",
-                                                                    as: "existingDrop",
-                                                                    in: "$$existingDrop.name"
-                                                                }
-                                                            },
-                                                            "$$this.name"
-                                                        ]
-                                                    }
-                                                },
-
-                                                in: {
-                                                    $cond: [
-                                                        {
-                                                            $gte: [
-                                                                "$$existingIndex",
-                                                                0
-                                                            ]
-                                                        },
-
-                                                        {
-                                                            $map: {
-                                                                input: "$$value",
-                                                                as: "existingDrop",
-
-                                                                in: {
-                                                                    $cond: [
-                                                                        {
-                                                                            $eq: [
-                                                                                "$$existingDrop.name",
-                                                                                "$$this.name"
-                                                                            ]
-                                                                        },
-
-                                                                        {
-                                                                            name: "$$existingDrop.name",
-                                                                            count: {
-                                                                                $add: [
-                                                                                    "$$existingDrop.count",
-                                                                                    "$$this.count"
-                                                                                ]
-                                                                            }
-                                                                        },
-
-                                                                        "$$existingDrop"
-                                                                    ]
-                                                                }
-                                                            }
-                                                        },
-
-                                                        {
-                                                            $concatArrays: [
-                                                                "$$value",
-                                                                [
-                                                                    {
-                                                                        name: "$$this.name",
-                                                                        count: "$$this.count"
-                                                                    }
-                                                                ]
-                                                            ]
-                                                        }
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            ],
+            statsUpdate(user.app_user, dungeon, runDuration, incomingDrops),
             {
                 upsert: true
             }
@@ -841,7 +705,8 @@ app.get("/dungeon-stats", async (req, res) => {
             success: true,
             runs: stats.runs || 0,
             total_time: stats.total_time || 0,
-            drops: stats.drops || []
+            drop_schema_version: stats.drop_schema_version || 1,
+            drops: normalizeDrops(stats.drops)
         });
 
     } catch (err) {
@@ -853,6 +718,44 @@ app.get("/dungeon-stats", async (req, res) => {
             message: "Internal server error"
         });
 
+    }
+});
+
+app.get('/drop-analytics', async (req, res) => {
+    let filters;
+    try {
+        filters = parseFilters(req.query);
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+    if (typeof req.query.session_id !== 'string' || !req.query.session_id) {
+        return res.status(400).json({ success: false, message: 'Missing session_id' });
+    }
+    try {
+        const session = await sessionsCollection.findOne({
+            session_id: req.query.session_id, expiresAt: { $gt: new Date() },
+        });
+        if (!session || !await usersCollection.findOne({ app_user: session.app_user })) {
+            return res.status(401).json({ success: false, message: 'Invalid session' });
+        }
+        const query = { app_user: session.app_user };
+        if (filters.days !== null) query.end_time = {
+            $gte: new Date(Date.now() - filters.days * 86400000),
+        };
+        const reports = dungeonRunsCollection.find(query, { projection: {
+            _id: 0, dungeon: 1, duration: 1, drops: 1, drop_schema_version: 1,
+            drop_details_tracked: 1, drop_tracking_complete: 1,
+        } }).maxTimeMS(15000);
+        let dungeons;
+        try {
+            dungeons = await summarizeReports(reports, filters);
+        } finally {
+            await reports.close();
+        }
+        return res.json({ success: true, filters, dungeons });
+    } catch (error) {
+        console.error('Drop analytics error:', error);
+        return res.status(500).json({ success: false, message: 'Statistics unavailable' });
     }
 });
 
