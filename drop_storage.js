@@ -70,4 +70,17 @@ function statsUpdate(appUser, dungeon, duration, drops) {
     } }];
 }
 
-module.exports = { normalizeDrops, statsUpdate };
+function statisticalDrops(drops) {
+    const visible = Array.isArray(drops)
+        ? drops.filter(drop => {
+            if (!drop) return false;
+            const id = typeof drop === 'object' ? (drop.id ?? drop.item_id) : null;
+            const name = typeof drop === 'string' ? drop : drop.name;
+            const baseName = typeof drop === 'object' ? drop.base_name : null;
+            const eventName = value => typeof value === 'string' && value.trim().toLowerCase() === 'eventos (1x1)';
+            return String(id) !== '1561' && !eventName(name) && !eventName(baseName);
+        }) : [];
+    return normalizeDrops(visible).filter(drop => drop.id !== 1561);
+}
+
+module.exports = { normalizeDrops, statisticalDrops, statsUpdate };

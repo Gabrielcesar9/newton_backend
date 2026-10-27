@@ -2,6 +2,16 @@
 const express = require('express');
 const { normalizeDrops, statisticalDrops, statsUpdate } = require('./drop_storage');
 const { parseFilters, summarizeReports, mergeLifetimeStats } = require('./drop_analytics');
+for (const [file, exports] of [
+    ['drop_storage.js', { normalizeDrops, statisticalDrops, statsUpdate }],
+    ['drop_analytics.js', { parseFilters, summarizeReports, mergeLifetimeStats }],
+]) {
+    for (const [name, value] of Object.entries(exports)) {
+        if (typeof value !== 'function') {
+            throw new Error(`${file} is missing ${name}. Deploy matching copies of server.js, drop_storage.js and drop_analytics.js together.`);
+        }
+    }
+}
 const { MongoClient } = require('mongodb');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,6 +30,14 @@ const validateLimiter = rateLimit({
 });
 
 require('dotenv').config(); // Load .env file if present
+
+// Trust only the configured reverse-proxy depth, not arbitrary forwarded IPs.
+// One hop trusts the proxy immediately in front of this Render web service.
+const proxyHops = process.env.TRUST_PROXY_HOPS || '1';
+if (!/^\d+$/.test(proxyHops) || !Number.isSafeInteger(Number(proxyHops))) {
+    throw new Error('TRUST_PROXY_HOPS must be a non-negative integer.');
+}
+app.set('trust proxy', Number(proxyHops));
 
 const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'Newton';
