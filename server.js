@@ -1,7 +1,7 @@
 // Node.js Express server with MongoDB for user-hardware validation
 const express = require('express');
-const { normalizeDrops, statsUpdate } = require('./drop_storage');
-const { parseFilters, summarizeReports } = require('./drop_analytics');
+const { normalizeDrops, statisticalDrops, statsUpdate } = require('./drop_storage');
+const { parseFilters, summarizeReports, mergeLifetimeStats } = require('./drop_analytics');
 const { MongoClient } = require('mongodb');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -624,7 +624,7 @@ app.post("/dungeon-complete", async (req, res) => {
                 app_user: user.app_user,
                 dungeon
             },
-            statsUpdate(user.app_user, dungeon, runDuration, incomingDrops),
+            statsUpdate(user.app_user, dungeon, runDuration, statisticalDrops(incomingDrops)),
             {
                 upsert: true
             }
@@ -706,7 +706,7 @@ app.get("/dungeon-stats", async (req, res) => {
             runs: stats.runs || 0,
             total_time: stats.total_time || 0,
             drop_schema_version: stats.drop_schema_version || 1,
-            drops: normalizeDrops(stats.drops)
+            drops: statisticalDrops(stats.drops)
         });
 
     } catch (err) {
@@ -751,6 +751,16 @@ app.get('/drop-analytics', async (req, res) => {
             dungeons = await summarizeReports(reports, filters);
         } finally {
             await reports.close();
+        }
+        if (filters.days === null && !filters.detailed) {
+            const lifetime = dungeonStatsCollection.find({ app_user: session.app_user }, { projection: {
+                _id: 0, dungeon: 1, runs: 1, total_time: 1, drops: 1,
+            } }).maxTimeMS(15000);
+            try {
+                dungeons = await mergeLifetimeStats(dungeons, lifetime, filters);
+            } finally {
+                await lifetime.close();
+            }
         }
         return res.json({ success: true, filters, dungeons });
     } catch (error) {
