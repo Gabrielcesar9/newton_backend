@@ -6,12 +6,14 @@ Replace these files together, using the current copies from the project root:
 server.js
 drop_storage.js
 drop_analytics.js
+drop_affixes.json
 package.json
 package-lock.json
 ```
 
-Place all five in the same deployment directory. The root `server.js` imports
-both helpers with relative paths. The separate `backend/server.js` in this
+Place all six in the same deployment directory. The root `server.js` imports
+both helpers with relative paths. The analytics helper also reads the shared
+`drop_affixes.json` catalog for English/Portuguese affix matching. The separate `backend/server.js` in this
 repository is an older server, and is not this entry point.
 
 Render settings for the directory containing these files:

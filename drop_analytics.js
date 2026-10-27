@@ -1,6 +1,21 @@
 const { statisticalDrops } = require('./drop_storage');
+const affixes = require('./drop_affixes.json');
 
 const folded = value => String(value || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+function affixForms(value) {
+    const forms = [value];
+    if (value.endsWith('(a)')) {
+        const masculine = value.slice(0, -3);
+        forms.push(masculine, masculine.endsWith('o') ? masculine.slice(0, -1) + 'a' : masculine + 'a');
+    }
+    return forms.map(folded);
+}
+const affixAliases = new Map();
+for (const entry of affixes) {
+    for (const value of Object.values(entry).flatMap(affixForms)) affixAliases.set(value, folded(entry.en));
+}
+const affixKey = value => affixAliases.get(folded(value)) || folded(value);
 
 function parseFilters(query) {
     const text = (field, max = 120) => {
@@ -29,7 +44,7 @@ function matches(drop, filters) {
         (!filters.item_name || folded(drop.base_name || drop.name) === folded(filters.item_name)) &&
         (filters.id === null || drop.id === filters.id) &&
         (!filters.affix || (filters.affix === 'unknown' ? drop.affix === null :
-            folded(drop.affix) === folded(filters.affix))) &&
+            affixKey(drop.affix) === affixKey(filters.affix))) &&
         ['upgrade', 'slots'].every(field => filters[field] === null ||
             (filters[field] === 'unknown' ? drop[field] === null : drop[field] === filters[field]));
 }

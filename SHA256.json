@@ -1,8 +1,9 @@
 {
   "server.js": "a64adf02381009b9a6d8ddc673b564d86445791ac001133c5f3b032c0d67f2f5",
   "drop_storage.js": "83bd0bbbb288d36da978da42b155a6eb944127d5a7b9c74f224a99c30f8d5c8d",
-  "drop_analytics.js": "be1e250c7dc21c0df6b0596ab7f790ea20bbfa745f2bb342700a6269163f73bb",
+  "drop_analytics.js": "105869b84a61b233a44c3159bc2097f5d973af59421f0e8eb3a192904345f427",
+  "drop_affixes.json": "528fad937677acb9e829a0ce02354483ddb8d433da8576cab4e820a3c2f0392a",
   "package.json": "df1c1bb3d97e16c8b47a5b9a430ab7bf31d10e239032905c7d3ce16d7fd0651f",
   "package-lock.json": "ff16314e6928b920ad7bde355d20e601782e4128aed08980a9c65a9786ff163b",
-  "SERVER_DEPLOYMENT.md": "ebc618932c705c9b7a25fffbe6943c190432eec71e44bb99bfbacaac57209d06"
+  "SERVER_DEPLOYMENT.md": "d37545d49ef44b627da0899479eb8824723d0054eba9c25d9822c752dd414947"
 }
